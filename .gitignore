@@ -1,0 +1,11 @@
+# Entornos virtuales
+venv/
+
+# Archivos de base de datos
+**/*.db
+
+
+# Archivos temporales y de respaldo
+* - copia*.*
+*.bak
+*.tmp

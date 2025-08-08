@@ -2,21 +2,23 @@ import tkinter as tk
 import sqlite3
 from modeld.perfiles_dao import Busqueda 
 from time import strftime
-from modeld.perfiles_dao import crear_tabla
-from modeld.perfiles_dao import crear_tabla_usuarios  # Asegúrate de ajustar la importación a la ubicación real del módulo
 from PIL import Image, ImageTk
-from modeld.conexion_db import ConexionDB
 from tkinter import font, messagebox
 from clientd.gui_app import Frame, barra_menu
 from datetime import datetime
 from clientd.gui_app import Frame   
 from clientd.gui_app import abrir_whatsapp
 from tkinter import Menu, PhotoImage
+from modeld.perfiles_dao import crear_tabla_usuarios 
+from modeld.conexion_db import ConexionDB
 
 def iniciar_aplicacion_principal(nivel_de_seguridad, nombre_usuario, rol_usuario):
     
-    app_principal = AplicacionPrincipal(nivel_de_seguridad, nombre_usuario, rol_usuario)
-    app_principal.mainloop()
+    root = tk.Tk()
+    root.title("ARCHIVO: DEPÓSITO")
+    root.geometry("1000x600")  # o el tamaño que quieras
+    app_principal = Frame(root=root)
+   
 
 class AplicacionPrincipal(tk.Tk):
     def __init__(self, nivel_de_seguridad, nombre_usuario, rol_usuario):
@@ -24,7 +26,7 @@ class AplicacionPrincipal(tk.Tk):
         self.nivel_de_seguridad = nivel_de_seguridad
         self.nombre_usuario = nombre_usuario  # <-- Guarda el usuario actual
         self.rol_usuario = rol_usuario
-        self.title(f"Base de Datos: IGPJ - Usuario: {nombre_usuario} | Rol: {rol_usuario}")
+        self.title(f"Base de Datos: - Usuario: {nombre_usuario} | Rol: {rol_usuario}")
         self.iconbitmap("img/taitalo.ico")        
 
         ## Crear un objeto de fuente con las características deseadas
@@ -194,9 +196,9 @@ class InicioSesionVentana(tk.Tk):
         menu_usuario.add_command(label="Crear", command=crear_tabla_usuarios)
 
         # Menú Tabla Archivo
-        menu_tabla = tk.Menu(barra_menu, tearoff=0)
-        barra_menu.add_cascade(label="Tabla ARCHIVO", menu=menu_tabla)
-        menu_tabla.add_command(label="Crear", command=crear_tabla)
+        #menu_tabla = tk.Menu(barra_menu, tearoff=0)
+        #barra_menu.add_cascade(label="Tabla ARCHIVO", menu=menu_tabla)
+        #menu_tabla.add_command(label="Crear", command=crear_tabla)
 
         # Cargar icono personalizado (asegurar que existe y es PNG)
         self.icono_wp = PhotoImage(file="img/whastapp.png")  # Se guarda en la instancia
