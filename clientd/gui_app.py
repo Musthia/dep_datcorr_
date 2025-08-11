@@ -327,11 +327,12 @@ class Frame(tk.Frame):
 
         self.etiqueta_reloj1 = tk.Label(self, font=('alarm clock', 28, 'bold'), bg="#676767", foreground='#000000')
         self.etiqueta_reloj1.grid(row=16, column=2)
-        self.actualizar_reloj1()
-       
+        self.actualizar_reloj1()       
 
+         # Configuración general de la grilla principal
         self.columnconfigure(0, weight=1)
-        self.rowconfigure(2, weight=1)
+        self.columnconfigure(1, weight=1)
+        self.rowconfigure(2, weight=1)  # Donde estará el Treeview
 
         self.crear_widgets()
 
@@ -348,7 +349,7 @@ class Frame(tk.Frame):
         # Entry
         self.entry_busqueda = tk.Entry(self)
         self.entry_busqueda.grid(row=0, column=1, padx=10, pady=10, sticky="we")
-        self.columnconfigure(1, weight=1)
+        
 
         # Combobox para seleccionar carpeta
         self.combo_area = ttk.Combobox(self, state="readonly")
@@ -373,18 +374,22 @@ class Frame(tk.Frame):
             foreground=[("disabled", "gray")])
 
         # Botón de búsqueda
-        boton_buscar = tk.Button(self, text="Buscar dato", command=self.buscar_dato)
-        boton_buscar.grid(row=0, column=3, padx=10, pady=10)
 
         btn_buscar = ttk.Button(self, text="Buscar dato", command=self.buscar_dato, style="Buscar.TButton")
         btn_buscar.grid(row=0, column=3, padx=5, pady=10, sticky="ew")
 
+        # Dentro del __init__ de tu clase Frame:
+
+        # Configurar que la fila donde está el Treeview ocupe todo el espacio disponible
+        self.grid_rowconfigure(2, weight=1)  # Fila donde está frame_resultados
+        self.grid_columnconfigure(0, weight=1)  # Columna principal
 
         # Frame para Treeview y Scrollbar
         self.frame_resultados = tk.Frame(self)
-        self.frame_resultados.grid(row=2, column=0, columnspan=4, sticky="nsew")
-        self.frame_resultados.columnconfigure(0, weight=1)
-        self.frame_resultados.rowconfigure(0, weight=1)
+        self.frame_resultados.grid(row=2, column=0, columnspan=5, sticky="nsew")
+        self.frame_resultados.columnconfigure(0, weight=1)  # Treeview
+        self.frame_resultados.columnconfigure(1, weight=0)  # Scrollbar
+        self.frame_resultados.rowconfigure(0, weight=1)     # Fila única
 
         # Crear Treeview y Scrollbar
         self.tree = None
@@ -400,6 +405,7 @@ class Frame(tk.Frame):
         return carpetas
 
     def crear_treeview(self, columnas):
+
         # Eliminar Treeview y scrollbar anteriores si existen
         if self.tree:
             self.tree.destroy()
@@ -410,9 +416,10 @@ class Frame(tk.Frame):
         self.scroll_y = ttk.Scrollbar(self.frame_resultados, orient="vertical")
         self.scroll_y.grid(row=0, column=1, sticky="ns")
 
-        # Crear Treeview
-        self.tree = ttk.Treeview(self.frame_resultados, columns=columnas, show="headings", yscrollcommand=self.scroll_y.set)
-        self.tree.grid(row=0, column=0, columnspan=3, sticky="nsew")
+        # Crear Treeview       
+
+        self.tree = ttk.Treeview(self.frame_resultados,columns=columnas, show="headings", yscrollcommand=self.scroll_y.set)
+        self.tree.grid(row=0, column=0, sticky="nsew")  # Se ajusta
         self.scroll_y.config(command=self.tree.yview)
 
         for col in columnas:

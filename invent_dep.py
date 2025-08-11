@@ -17,6 +17,8 @@ def iniciar_aplicacion_principal(nivel_de_seguridad, nombre_usuario, rol_usuario
     root = tk.Tk()
     root.title("ARCHIVO: DEPÓSITO")
     root.geometry("1000x600")  # o el tamaño que quieras
+    root.rowconfigure(0, weight=1)
+    root.columnconfigure(0, weight=1)
     app_principal = Frame(root=root)
    
 
