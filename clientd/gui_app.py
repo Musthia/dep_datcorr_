@@ -412,12 +412,12 @@ class Frame(tk.Frame):
 
         # Crear Treeview
         self.tree = ttk.Treeview(self.frame_resultados, columns=columnas, show="headings", yscrollcommand=self.scroll_y.set)
-        self.tree.grid(row=0, column=0, sticky="nsew")
+        self.tree.grid(row=0, column=0, columnspan=3, sticky="nsew")
         self.scroll_y.config(command=self.tree.yview)
 
         for col in columnas:
             self.tree.heading(col, text=col)
-            self.tree.column(col, anchor="w", width=100)
+            self.tree.column(col, anchor="w", width=50)
 
     def buscar_dato(self):
         dato_busqueda = self.entry_busqueda.get().strip()
