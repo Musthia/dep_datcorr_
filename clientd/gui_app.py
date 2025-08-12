@@ -429,38 +429,37 @@ class Frame(tk.Frame):
     def buscar_dato(self):
         dato_busqueda = self.entry_busqueda.get().strip()
         carpeta_area = self.combo_area.get()
-
+    
         if not dato_busqueda:
             messagebox.showwarning("Advertencia", "Por favor, ingrese un dato para buscar.")
             return
         if not carpeta_area:
             messagebox.showwarning("Advertencia", "Seleccione un área para realizar la búsqueda.")
             return
-
+    
         ruta_carpeta = os.path.join(CARPETA_EXCEL, carpeta_area)
         resultados = []
-        columnas_resultado = set()
-
+        columnas_resultado = None  # Para mantener orden
+    
         for archivo in os.listdir(ruta_carpeta):
-            if archivo.endswith(".xlsx") or archivo.endswith(".xls"):
+            if archivo.endswith((".xlsx", ".xls")):
                 ruta_archivo = os.path.join(ruta_carpeta, archivo)
                 try:
                     xls = pd.ExcelFile(ruta_archivo)
                     for hoja in xls.sheet_names:
-                        df = xls.parse(hoja).astype(str)  # Convertir todo a string para búsqueda flexible
-                        coincidencias = df[df.apply(lambda row: row.astype(str).str.contains(dato_busqueda, case=False, na=False).any(), axis=1)]
+                        df = xls.parse(hoja).astype(str)  # Todo como texto
+                        coincidencias = df[df.apply(lambda row: row.str.contains(dato_busqueda, case=False, na=False).any(), axis=1)]
                         if not coincidencias.empty:
+                            if columnas_resultado is None:
+                                columnas_resultado = list(coincidencias.columns)  # Guardar orden
                             resultados.extend(coincidencias.values.tolist())
-                            columnas_resultado.update(coincidencias.columns.tolist())
                 except Exception as e:
                     print(f"Error al procesar {archivo}: {e}")
-
-        if resultados:
-            columnas = list(columnas_resultado)
-            self.crear_treeview(columnas)
+    
+        if resultados and columnas_resultado:
+            self.crear_treeview(columnas_resultado)
             for fila in resultados:
-                fila_completa = fila + [""] * (len(columnas) - len(fila))
-                self.tree.insert("", "end", values=fila_completa)
+                self.tree.insert("", "end", values=fila)
         else:
             self.crear_treeview([])
             messagebox.showinfo("Sin resultados", "No se encontraron coincidencias.")
