@@ -492,51 +492,61 @@ class Frame(tk.Frame):
         if not seleccionado:
             messagebox.showwarning("Advertencia", "Seleccione una fila para editar.")
             return
-
+    
         valores = self.tree.item(seleccionado, "values")
         columnas = self.tree["columns"]
-
+    
         # Ventana secundaria
         editor = tk.Toplevel(self)
         editor.title("Editar fila")
         editor.geometry("500x400")
-
+    
         entradas = {}
         for i, col in enumerate(columnas):
             tk.Label(editor, text=col).grid(row=i, column=0, padx=10, pady=5, sticky="e")
+    
             entrada = tk.Entry(editor, width=40)
             entrada.insert(0, valores[i])
+    
+            if col in ("Archivo", "Hoja"):  # Campos no editables
+                entrada.config(state="readonly", disabledforeground="black")
             entrada.grid(row=i, column=1, padx=10, pady=5, sticky="w")
+    
             entradas[col] = entrada
-
+    
         def guardar_cambios():
-            nuevos_valores = [entradas[col].get() for col in columnas]
-
-            # Identificar archivo y hoja originales
-            # 🔹 Aquí asumo que guardamos el origen de cada fila en un atributo adicional
+            # Solo tomar las columnas reales del Excel (excluyendo Archivo y Hoja)
+            columnas_excel = [c for c in columnas if c not in ("Archivo", "Hoja")]
+            nuevos_valores = [entradas[col].get() for col in columnas_excel]
+    
+            # Identificar archivo y hoja originales desde tags
             origen = self.tree.item(seleccionado, "tags")  # Ej: ("archivo.xlsx", "Hoja1", "índice_fila")
-            if not origen:
+            if not origen or len(origen) < 3:
                 messagebox.showerror("Error", "No se puede determinar el archivo original.")
                 return
-
+    
             archivo, hoja, indice_fila = origen
             ruta_archivo = os.path.join(CARPETA_EXCEL, self.combo_area.get(), archivo)
-
+    
             try:
                 # Abrir y modificar Excel
                 df = pd.read_excel(ruta_archivo, sheet_name=hoja, dtype=str)
                 df.iloc[int(indice_fila)] = nuevos_valores
                 df.to_excel(ruta_archivo, sheet_name=hoja, index=False)
-
-                # Actualizar Treeview
-                self.tree.item(seleccionado, values=nuevos_valores)
+    
+                # Actualizar solo las columnas editables en el Treeview
+                fila_treeview = [archivo, hoja] + nuevos_valores
+                self.tree.item(seleccionado, values=fila_treeview)
+    
                 messagebox.showinfo("Éxito", "Registro actualizado correctamente.")
                 editor.destroy()
-
+    
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo guardar: {e}")
-
-        tk.Button(editor, text="Guardar", command=guardar_cambios, bg="#4CAF50", fg="white").grid(row=len(columnas), column=0, columnspan=2, pady=10)
+    
+        tk.Button(editor, text="Guardar", command=guardar_cambios, bg="#4CAF50", fg="white").grid(
+            row=len(columnas), column=0, columnspan=2, pady=10
+        )
 
 
 
