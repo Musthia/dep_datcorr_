@@ -378,6 +378,9 @@ class Frame(tk.Frame):
         btn_buscar = ttk.Button(self, text="Buscar dato", command=self.buscar_dato, style="Buscar.TButton")
         btn_buscar.grid(row=0, column=3, padx=5, pady=10, sticky="ew")
 
+        btn_editar = ttk.Button(self, text="Editar dato", command=self.abrir_editor, style="Buscar.TButton")
+        btn_editar.grid(row=16, column=1, padx=5, pady=10, sticky="ew")
+
         # Dentro del __init__ de tu clase Frame:
 
         # Configurar que la fila donde está el Treeview ocupe todo el espacio disponible
@@ -405,6 +408,8 @@ class Frame(tk.Frame):
         return carpetas
 
     def crear_treeview(self, columnas):
+        # Agregar siempre las columnas "Archivo" y "Hoja" al inicio
+        columnas_con_extra = ["Archivo", "Hoja"] + columnas
 
         # Eliminar Treeview y scrollbar anteriores si existen
         if self.tree:
@@ -416,53 +421,124 @@ class Frame(tk.Frame):
         self.scroll_y = ttk.Scrollbar(self.frame_resultados, orient="vertical")
         self.scroll_y.grid(row=0, column=1, sticky="ns")
 
-        # Crear Treeview       
-
-        self.tree = ttk.Treeview(self.frame_resultados,columns=columnas, show="headings", yscrollcommand=self.scroll_y.set)
-        self.tree.grid(row=0, column=0, sticky="nsew")  # Se ajusta
+        # Crear Treeview
+        self.tree = ttk.Treeview(
+            self.frame_resultados,
+            columns=columnas_con_extra,
+            show="headings",
+            yscrollcommand=self.scroll_y.set
+        )
+        self.tree.grid(row=0, column=0, sticky="nsew")
         self.scroll_y.config(command=self.tree.yview)
 
-        for col in columnas:
+        # Configurar encabezados y ancho
+        for col in columnas_con_extra:
             self.tree.heading(col, text=col)
-            self.tree.column(col, anchor="w", width=50)
+            if col in ("Archivo", "Hoja"):
+                self.tree.column(col, anchor="w", width=120)  # Más ancho para texto
+            else:
+                self.tree.column(col, anchor="w", width=50)
+
 
     def buscar_dato(self):
         dato_busqueda = self.entry_busqueda.get().strip()
         carpeta_area = self.combo_area.get()
-    
+
         if not dato_busqueda:
             messagebox.showwarning("Advertencia", "Por favor, ingrese un dato para buscar.")
             return
         if not carpeta_area:
             messagebox.showwarning("Advertencia", "Seleccione un área para realizar la búsqueda.")
             return
-    
+
         ruta_carpeta = os.path.join(CARPETA_EXCEL, carpeta_area)
         resultados = []
-        columnas_resultado = None  # Para mantener orden
-    
+        columnas_resultado = None  # Para mantener el orden exacto
+
         for archivo in os.listdir(ruta_carpeta):
             if archivo.endswith((".xlsx", ".xls")):
                 ruta_archivo = os.path.join(ruta_carpeta, archivo)
                 try:
                     xls = pd.ExcelFile(ruta_archivo)
                     for hoja in xls.sheet_names:
-                        df = xls.parse(hoja).astype(str)  # Todo como texto
-                        coincidencias = df[df.apply(lambda row: row.str.contains(dato_busqueda, case=False, na=False).any(), axis=1)]
+                        df = xls.parse(hoja).astype(str)  # Convertir todo a texto
+                        coincidencias = df[df.apply(
+                            lambda row: row.str.contains(dato_busqueda, case=False, na=False).any(),
+                            axis=1
+                        )]
+
                         if not coincidencias.empty:
                             if columnas_resultado is None:
                                 columnas_resultado = list(coincidencias.columns)  # Guardar orden
-                            resultados.extend(coincidencias.values.tolist())
+                            for idx, fila in coincidencias.iterrows():
+                                resultados.append((fila.tolist(), archivo, hoja, idx))
+
                 except Exception as e:
                     print(f"Error al procesar {archivo}: {e}")
-    
+
         if resultados and columnas_resultado:
             self.crear_treeview(columnas_resultado)
-            for fila in resultados:
-                self.tree.insert("", "end", values=fila)
+            for fila, archivo, hoja, idx in resultados:
+                fila_completa = [archivo, hoja] + fila
+                self.tree.insert("", "end", values=fila_completa, tags=(archivo, hoja, str(idx)))
+
         else:
             self.crear_treeview([])
             messagebox.showinfo("Sin resultados", "No se encontraron coincidencias.")
+
+
+    def abrir_editor(self):
+        seleccionado = self.tree.focus()
+        if not seleccionado:
+            messagebox.showwarning("Advertencia", "Seleccione una fila para editar.")
+            return
+
+        valores = self.tree.item(seleccionado, "values")
+        columnas = self.tree["columns"]
+
+        # Ventana secundaria
+        editor = tk.Toplevel(self)
+        editor.title("Editar fila")
+        editor.geometry("500x400")
+
+        entradas = {}
+        for i, col in enumerate(columnas):
+            tk.Label(editor, text=col).grid(row=i, column=0, padx=10, pady=5, sticky="e")
+            entrada = tk.Entry(editor, width=40)
+            entrada.insert(0, valores[i])
+            entrada.grid(row=i, column=1, padx=10, pady=5, sticky="w")
+            entradas[col] = entrada
+
+        def guardar_cambios():
+            nuevos_valores = [entradas[col].get() for col in columnas]
+
+            # Identificar archivo y hoja originales
+            # 🔹 Aquí asumo que guardamos el origen de cada fila en un atributo adicional
+            origen = self.tree.item(seleccionado, "tags")  # Ej: ("archivo.xlsx", "Hoja1", "índice_fila")
+            if not origen:
+                messagebox.showerror("Error", "No se puede determinar el archivo original.")
+                return
+
+            archivo, hoja, indice_fila = origen
+            ruta_archivo = os.path.join(CARPETA_EXCEL, self.combo_area.get(), archivo)
+
+            try:
+                # Abrir y modificar Excel
+                df = pd.read_excel(ruta_archivo, sheet_name=hoja, dtype=str)
+                df.iloc[int(indice_fila)] = nuevos_valores
+                df.to_excel(ruta_archivo, sheet_name=hoja, index=False)
+
+                # Actualizar Treeview
+                self.tree.item(seleccionado, values=nuevos_valores)
+                messagebox.showinfo("Éxito", "Registro actualizado correctamente.")
+                editor.destroy()
+
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo guardar: {e}")
+
+        tk.Button(editor, text="Guardar", command=guardar_cambios, bg="#4CAF50", fg="white").grid(row=len(columnas), column=0, columnspan=2, pady=10)
+
+
 
 if __name__ == "__main__":
     app = Frame()
