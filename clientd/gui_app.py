@@ -443,110 +443,151 @@ class Frame(tk.Frame):
     def buscar_dato(self):
         dato_busqueda = self.entry_busqueda.get().strip()
         carpeta_area = self.combo_area.get()
-
+    
         if not dato_busqueda:
             messagebox.showwarning("Advertencia", "Por favor, ingrese un dato para buscar.")
             return
         if not carpeta_area:
             messagebox.showwarning("Advertencia", "Seleccione un área para realizar la búsqueda.")
             return
-
+    
         ruta_carpeta = os.path.join(CARPETA_EXCEL, carpeta_area)
         resultados = []
-        columnas_resultado = None  # Para mantener el orden exacto
-
+        columnas_resultado = None  # Mantener el orden original de Excel
+    
         for archivo in os.listdir(ruta_carpeta):
             if archivo.endswith((".xlsx", ".xls")):
                 ruta_archivo = os.path.join(ruta_carpeta, archivo)
                 try:
                     xls = pd.ExcelFile(ruta_archivo)
                     for hoja in xls.sheet_names:
-                        df = xls.parse(hoja).astype(str)  # Convertir todo a texto
+                        df = xls.parse(hoja).astype(str)  # Convertir todo a string
+    
+                        # Buscar coincidencias
                         coincidencias = df[df.apply(
                             lambda row: row.str.contains(dato_busqueda, case=False, na=False).any(),
                             axis=1
                         )]
-
+    
                         if not coincidencias.empty:
                             if columnas_resultado is None:
-                                columnas_resultado = list(coincidencias.columns)  # Guardar orden
+                                columnas_resultado = list(coincidencias.columns)
+    
                             for idx, fila in coincidencias.iterrows():
-                                resultados.append((fila.tolist(), archivo, hoja, idx))
-
+                                # Asegurarse que exista columna "Registro"
+                                if "Registro" not in df.columns:
+                                    fila_registro = ""
+                                else:
+                                    fila_registro = fila.get("Registro", "")
+    
+                                # Guardar fila + info de origen
+                                resultados.append((
+                                    [archivo, hoja] + fila.tolist() + [fila_registro],  # fila completa con Archivo, Hoja y Registro
+                                    archivo,
+                                    hoja,
+                                    idx
+                                ))
+    
                 except Exception as e:
                     print(f"Error al procesar {archivo}: {e}")
-
+    
         if resultados and columnas_resultado:
-            self.crear_treeview(columnas_resultado)
-            for fila, archivo, hoja, idx in resultados:
-                fila_completa = [archivo, hoja] + fila
+            # Columnas finales para Treeview: Archivo, Hoja, todas de Excel, Registro
+            tree_columns = ["Archivo", "Hoja"] + columnas_resultado + ["Registro"]
+            self.crear_treeview(tree_columns)
+    
+            for fila_completa, archivo, hoja, idx in resultados:
                 self.tree.insert("", "end", values=fila_completa, tags=(archivo, hoja, str(idx)))
-
+    
         else:
             self.crear_treeview([])
             messagebox.showinfo("Sin resultados", "No se encontraron coincidencias.")
 
+
+
+    from datetime import datetime
 
     def abrir_editor(self):
         seleccionado = self.tree.focus()
         if not seleccionado:
             messagebox.showwarning("Advertencia", "Seleccione una fila para editar.")
             return
-    
+
         valores = self.tree.item(seleccionado, "values")
         columnas = self.tree["columns"]
-    
+
         # Ventana secundaria
         editor = tk.Toplevel(self)
         editor.title("Editar fila")
         editor.geometry("500x400")
-    
+
         entradas = {}
         for i, col in enumerate(columnas):
             tk.Label(editor, text=col).grid(row=i, column=0, padx=10, pady=5, sticky="e")
-    
+
             entrada = tk.Entry(editor, width=40)
             entrada.insert(0, valores[i])
-    
-            if col in ("Archivo", "Hoja"):  # Campos no editables
+
+            # Campos no editables
+            if col in ("Archivo", "Hoja"):
                 entrada.config(state="readonly", disabledforeground="black")
-            entrada.grid(row=i, column=1, padx=10, pady=5, sticky="w")
-    
+
             entradas[col] = entrada
-    
+            entrada.grid(row=i, column=1, padx=10, pady=5, sticky="w")
+
         def guardar_cambios():
-            # Solo tomar las columnas reales del Excel (excluyendo Archivo y Hoja)
+            # Determinar columnas editables (excluye Archivo y Hoja)
             columnas_excel = [c for c in columnas if c not in ("Archivo", "Hoja")]
+
+            # Tomar los valores editables
             nuevos_valores = [entradas[col].get() for col in columnas_excel]
-    
+
             # Identificar archivo y hoja originales desde tags
             origen = self.tree.item(seleccionado, "tags")  # Ej: ("archivo.xlsx", "Hoja1", "índice_fila")
             if not origen or len(origen) < 3:
                 messagebox.showerror("Error", "No se puede determinar el archivo original.")
                 return
-    
+
             archivo, hoja, indice_fila = origen
             ruta_archivo = os.path.join(CARPETA_EXCEL, self.combo_area.get(), archivo)
-    
+
             try:
-                # Abrir y modificar Excel
+                # Abrir Excel original
                 df = pd.read_excel(ruta_archivo, sheet_name=hoja, dtype=str)
-                df.iloc[int(indice_fila)] = nuevos_valores
+
+                # Actualizar valores editables
+                for col_idx, col in enumerate(columnas_excel):
+                    df.iloc[int(indice_fila), df.columns.get_loc(col)] = nuevos_valores[col_idx]
+
+                # Actualizar columna Registro con fecha y hora actual
+                if "Registro" in df.columns:
+                    df.loc[int(indice_fila), "Registro"] = strftime('%Y-%m-%d %H:%M:%S')
+
+                # Guardar cambios
                 df.to_excel(ruta_archivo, sheet_name=hoja, index=False)
-    
-                # Actualizar solo las columnas editables en el Treeview
-                fila_treeview = [archivo, hoja] + nuevos_valores
+
+                # Actualizar fila en Treeview
+                fila_treeview = []
+                for col in columnas:
+                    if col in ("Archivo", "Hoja"):
+                        fila_treeview.append(valores[columnas.index(col)])
+                    elif col == "Registro":
+                        fila_treeview.append(strftime('%Y-%m-%d %H:%M:%S'))
+                    else:
+                        fila_treeview.append(entradas[col].get())
+
                 self.tree.item(seleccionado, values=fila_treeview)
-    
+
                 messagebox.showinfo("Éxito", "Registro actualizado correctamente.")
                 editor.destroy()
-    
+
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo guardar: {e}")
-    
-        tk.Button(editor, text="Guardar", command=guardar_cambios, bg="#4CAF50", fg="white").grid(
-            row=len(columnas), column=0, columnspan=2, pady=10
-        )
+
+        tk.Button(editor, text="Guardar", command=guardar_cambios, bg="#4CAF50", fg="white")\
+            .grid(row=len(columnas), column=0, columnspan=2, pady=10)
+
+
 
 
 
