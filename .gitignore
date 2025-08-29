@@ -6,6 +6,5 @@ venv/
 
 
 # Archivos temporales y de respaldo
-* - copia*.*
 *.bak
 *.tmp
